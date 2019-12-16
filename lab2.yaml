@@ -1,0 +1,982 @@
+********************************************************************
+     Lab6 Manage Deployments
+********************************************************************
+
+-Create  deployment using YAML
+$ cat deployment.yaml
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2 # tells deployment to run 2 pods matching the template
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports: 
+        - containerPort: 80
+
+$ kubectl apply -f deployment.yaml
+$ kubectl describe deployment nginx-deployment
+$ kubectl get pods -l app=nginx
+
+-Update the Deployment (change nginx version to 1.8)
+$ cat deployment.yaml
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.8 # Update the version of nginx from 1.7.9 to 1.8
+        ports:
+        - containerPort: 80
+
+$ kubectl apply -f deployment.yaml
+$ kubectl get pods -l app=nginx
+$ kubectl describe deployment nginx-deployment
+-Generate Deployment Description
+$ kubectl create deployment my-nginx --image nginx -o yaml --dry-run
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: my-nginx
+  name: my-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-nginx
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: my-nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+status: {}
+
+********************************************************************
+     Lab7 Manage Services
+********************************************************************
+
+For some parts of your application (e.g. frontends) you may want to expose a Service onto an external (outside of your cluster) IP address.
+
+Kubernetes ServiceTypes allow you to specify what kind of service you want. The default is ClusterIP.
+
+Type values and their behaviors are:
+
+-ClusterIP: Exposes the service on a cluster-internal IP. Choosing this value makes the service only reachable from within the cluster. This is the default ServiceType.
+-NodePort: Exposes the service on each Node’s IP at a static port (the NodePort). A ClusterIP service, to which the NodePort service will route, is automatically created. You’ll be able to contact the NodePort service, from outside the cluster, by requesting <NodeIP>:<NodePort>.
+-LoadBalancer: Exposes the service externally using a cloud provider’s load balancer. NodePort and ClusterIP services, to which the external load balancer will route, are automatically created.
+-ExternalName: Maps the service to the contents of the externalName field (e.g. foo.bar.example.com), by returning a CNAME record with its value. No proxying of any kind is set up. This requires version 1.7 or higher of kube-dns
+
+
+1-Create Services and expose deployment
+
+$ kubectl run kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1 --port=8080
+
+vagrant@master:~$ kubectl get services
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   2d
+vagrant@master:~$ kubectl get deployments
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           3h
+
+vagrant@master:~$ kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
+service/kubernetes-bootcamp exposed
+
+vagrant@master:~$ kubectl get services
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes            ClusterIP   10.96.0.1      <none>        443/TCP          2d
+kubernetes-bootcamp   NodePort    10.106.4.223   <none>        8080:32156/TCP   7s
+vagrant@master:~$ kubectl describe services/kubernetes-bootcamp
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.106.4.223
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  32156/TCP
+Endpoints:                10.40.0.1:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+vagrant@master:~$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')
+
+vagrant@master:~$ ifconfig 
+My IP is 10.0.0.10
+vagrant@master:~$ curl 10.0.0.10:$NODE_PORT
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-69bf88c8c-5x9x9 | v=1
+vagrant@master:~
+Try to access with portfording on virtualbox (Nat Adapter)
+http://localhost:8081   (8081<-->31042)
+http://192.168.135.89:8081/
+
+2-Create Service using YAML template
+2.1 Create the deployment
+$ cat app-my-nginx.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    matchLabels:
+      app: my-nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: my-nginx
+    spec:
+      containers:
+      - name: my-nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+$ kubectl apply -f ./app-my-nginx.yaml
+$ kubectl get pods -l app=my-nginx -o wide
+$ kubectl get pods -l app=my-nginx -o yaml | grep podIP
+
+2.2 Create the service (Type NodePort)
+
+$ cat nginx-svc.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx
+  labels:
+    app: my-nginx
+spec:
+  ports:
+  - port: 8081
+    protocol: TCP
+    targetPort: 80
+  type: NodePort
+  selector:
+    app: my-nginx
+
+$ kubectl apply -f nginx-svc.yaml 
+$ kubectl get svc my-nginx
+NAME       TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+my-nginx   NodePort   10.101.148.220   <none>        8081:32040/TCP   8m54s
+$ kubectl describe svc my-nginx
+
+2.3 Access to Service
+
+$  curl http://10.101.148.220:32040
+
+$ vagrant ssh node1
+vagrant@node1:~$  curl http://10.101.148.220:8081
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+vagrant@node1:~$
+
+2.4 Create a second Service (Type LoadBalancer)
+$ cat app2-my-nginx.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx-2
+  labels:
+    app: my-nginx-2
+spec:
+  ports:
+  - port: 8081
+    protocol: TCP
+    targetPort: 80
+  type: LoadBalancer
+  selector:
+    app: my-nginx-2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx-2
+spec:
+  selector:
+    matchLabels:
+      app: my-nginx-2
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: my-nginx-2
+    spec:
+      containers:
+      - name: my-nginx-2
+        image: nginx
+        ports:
+        - containerPort: 80 
+
+$ kubectl apply -f app2-my-nginx.yaml
+service/my-nginx-2 created
+deployment.apps/my-nginx-2 created
+$ kubectl get services
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+kubernetes   ClusterIP      10.96.0.1        <none>        443/TCP          26h
+my-nginx     NodePort       10.101.148.220   <none>        8081:32040/TCP   42m
+my-nginx-2   LoadBalancer   10.110.0.223     <pending>     8081:32477/TCP   22m
+$ curl http://10.0.0.10:32477
+
+https://kubernetes.io/docs/concepts/services-networking/ingress/
+https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+
+********************************************************************
+     Lab8 Scale up Application
+********************************************************************
+
+1-Scaling an application
+
+$ kubectl run kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1 --port=8080
+
+vagrant@master:~$ kubectl get deployment
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           7h
+vagrant@master:~$ kubectl scale deployments/kubernetes-bootcamp --replicas=3
+deployment.extensions/kubernetes-bootcamp scaled
+vagrant@master:~$ kubectl get deployment
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   3         3         3            2           7h
+
+The DESIRED state is showing the configured number of replicas
+
+The CURRENT state show how many replicas are running now
+
+The UP-TO-DATE is the number of replicas that were updated to match the desired (configured) state
+
+The AVAILABLE state shows how many replicas are actually AVAILABLE to the users
+
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-5x9x9   1/1       Running             0          7h
+
+
+
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running             0          11s
+kubernetes-bootcamp-69bf88c8c-qsg95   0/1       ContainerCreating   0          11s
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-5x9x9   1/1       Running             0          7h
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running             0          15s
+kubernetes-bootcamp-69bf88c8c-qsg95   0/1       ContainerCreating   0          15s
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS             RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-5x9x9   1/1       Running            0          7h        10.40.0.1   node1     <none>
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running            0          27s       10.40.0.2   node1     <none>
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running            0          27s       10.32.0.5   node2     <none>
+
+$ kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
+
+vagrant@master:~$ kubectl describe services/kubernetes-bootcamp
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.106.4.223
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  32156/TCP
+Endpoints:                10.32.0.5:8080,10.40.0.1:8080,10.40.0.2:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+vagrant@master:~$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')
+vagrant@master:~$ curl 10.0.0.10:$NODE_PORT
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-69bf88c8c-k9jl7 | v=1
+
+
+2-Delete Pods
+vagrant@master:~$ kubectl delete pods kubernetes-bootcamp-69bf88c8c-5x9x9
+pod "kubernetes-bootcamp-69bf88c8c-5x9x9" deleted
+-->Aussitôt supprimé, aussitôt recréé ! 
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS        RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-5x9x9   0/1       Terminating   0          7h        <none>      node1     <none>
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Running       0          34s       10.40.0.3   node1     <none>
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running       0          32m       10.40.0.2   node1     <none>
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running       0          32m       10.32.0.5   node2     <none>
+myapp-pod                             1/1       Running       106        23h       10.32.0.4   node2     <none>
+vagrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS    RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Running   0          45s       10.40.0.3   node1     <none>
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running   0          32m       10.40.0.2   node1     <none>
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running   0          32m       10.32.0.5   node2     <none>
+myapp-pod                             1/1       Running   106        23h       10.32.0.4   node2     <none>
+vagrant@master:~$
+
+********************************************************************
+     Lab9 Performing a Rolling Update
+********************************************************************
+
+-Update the version of the app (V1 to V2)
+
+vagrant@master:~$ kubectl set image deployments/kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v2
+deployment.extensions/kubernetes-bootcamp image updated
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Running             0          27m
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running             0          58m
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running             0          58m
+kubernetes-bootcamp-b9cdd8865-r55qn   0/1       ContainerCreating   0          3s
+myapp-pod                             1/1       Running             109        1d
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Terminating         0          27m
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Running             0          58m
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running             0          58m
+kubernetes-bootcamp-b9cdd8865-bzqdf   0/1       ContainerCreating   0          0s
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Running             0          6s
+myapp-pod                             1/1       Running             109        1d
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS        RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Terminating   0          27m
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Terminating   0          59m
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Terminating   0          59m
+kubernetes-bootcamp-b9cdd8865-bzqdf   1/1     
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Running             0          58m
+kubernetes-bootcamp-b9cdd8865-bzqdf   0/1       ContainerCreating   0          0s
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Running             0          6s
+myapp-pod                             1/1       Running             109        1d
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS        RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-jkv7s   1/1       Terminating   0          27m
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Terminating   0          59m
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Terminating   0          59m
+kubernetes-bootcamp-b9cdd8865-bzqdf   1/1       Running       0          18s
+kubernetes-bootcamp-b9cdd8865-jrkdm   1/1       Running       0          7s
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Running       0          24s
+myapp-pod                             1/1       Running       109        1d
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS        RESTARTS   AGE
+kubernetes-bootcamp-69bf88c8c-jkv7s   0/1       Terminating   0          27m
+kubernetes-bootcamp-69bf88c8c-k9jl7   1/1       Terminating   0          59m
+kubernetes-bootcamp-69bf88c8c-qsg95   1/1       Terminating   0          59m
+kubernetes-bootcamp-b9cdd8865-bzqdf   1/1       Running       0          34s
+kubernetes-bootcamp-b9cdd8865-jrkdm   1/1       Running       0          23s
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Running       0          40s
+myapp-pod                             1/1       Running       109        1d
+
+vagrant@master:~$ kubectl get pods
+NAME                                  READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-b9cdd8865-bzqdf   1/1       Running   0          51s
+kubernetes-bootcamp-b9cdd8865-jrkdm   1/1       Running   0          40s
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Running   0          57s
+myapp-pod                             1/1       Running   109        1d
+vagrant@master:~$ 
+
+-Verify an update (V1 to V2)
+vagrant@master:~$ kubectl describe services/kubernetes-bootcamp
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.106.4.223
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  32156/TCP
+Endpoints:                10.32.0.6:8080,10.32.0.7:8080,10.40.0.1:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+vagrant@master:~$ kubectl describe pods
+
+-Rollback an update (V2 to V1)
+vagrant@master:~$ kubectl rollout undo deployments/kubernetes-bootcamp
+deployment.extensions/kubernetes-bootcamp
+vagrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS             RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-gcl6p   1/1       Running            0          7s        10.32.0.5   node2     <none>
+kubernetes-bootcamp-69bf88c8c-wnzkx   1/1       Running            0          5s        10.40.0.3   node1     <none>
+kubernetes-bootcamp-69bf88c8c-xg5xz   1/1       Running            0          8s        10.40.0.2   node1     <none>
+kubernetes-bootcamp-b9cdd8865-bzqdf   1/1       Terminating        0          15m       10.40.0.1   node1     <none>
+kubernetes-bootcamp-b9cdd8865-jrkdm   1/1       Terminating        0          15m       10.32.0.7   node2     <none>
+kubernetes-bootcamp-b9cdd8865-r55qn   1/1       Terminating        0          15m       10.32.0.6   node2     <none>
+
+agrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS    RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-gcl6p   1/1       Running   0          1m        10.32.0.5   node2     <none>
+kubernetes-bootcamp-69bf88c8c-wnzkx   1/1       Running   0          1m        10.40.0.3   node1     <none>
+kubernetes-bootcamp-69bf88c8c-xg5xz   1/1       Running   0          1m        10.40.0.2   node1     <none>
+myapp-pod                             1/1       Running   112        1d        10.32.0.4   node2     <none>
+
+vagrant@master:~$ kubectl describe pods -l run=kubernetes-bootcamp
+Name:               kubernetes-bootcamp-69bf88c8c-gcl6p
+Namespace:          default
+Priority:           0
+PriorityClassName:  <none>
+Node:               node2/10.0.0.12
+Start Time:         Fri, 14 Sep 2018 01:04:31 +0000
+Labels:             pod-template-hash=256944747
+                    run=kubernetes-bootcamp
+Annotations:        <none>
+Status:             Running
+IP:                 10.32.0.5
+Controlled By:      ReplicaSet/kubernetes-bootcamp-69bf88c8c
+Containers:
+  kubernetes-bootcamp:
+    Container ID:   docker://571fa4c690eeed4139c10dbb0321cd4921d7605ae2f89862f5050a0acc5bb955
+    Image:          gcr.io/google-samples/kubernetes-bootcamp:v1
+    Image ID:       docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Fri, 14 Sep 2018 01:04:32 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-6dtkp (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  default-token-6dtkp:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-6dtkp
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  4m    default-scheduler  Successfully assigned default/kubernetes-bootcamp-69bf88c8c-gcl6p to node2
+  Normal  Pulled     4m    kubelet, node2     Container image "gcr.io/google-samples/kubernetes-bootcamp:v1" already present on machine
+  Normal  Created    4m    kubelet, node2     Created container
+  Normal  Started    4m    kubelet, node2     Started container
+
+
+
+
+
+********************************************************************
+     Lab10 Working with Volumes
+********************************************************************
+
+-Working with Volume
+
+-Use Case 1: External Storage Server (Cloud of NFS)
+-Static Persistent volume claim (PVC)
+(exemple  GCE, AWS EBS, or using external NFS)
+-Dynamic Provisioning with StorageClasses
+(exemple using NFS client provisioner or Cloud client provisioner)
+
+-Use Case 2 : In cluster Storage Server (NFS)
+
+1-Static Persistent volume claim (PVC)
+
+---->Prerequisites
+SSH in to each node and install the nfs-common OS package (e.g. sudo apt-get update && sudo apt-get -y install nfs-common)
+---->Create NFS server Pod
+
+vagrant@master:~$ cat nfs-server-rc.yaml 
+kind: Service
+apiVersion: v1
+metadata:
+  name: nfs-server
+spec:
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+  selector:
+    role: nfs-server
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nfs-server
+spec:
+  replicas: 1
+  selector:
+    role: nfs-server
+  template:
+    metadata:
+      labels:
+        role: nfs-server
+    spec:
+      containers:
+      - name: nfs-server
+        image: gcr.io/google_containers/volume-nfs:0.8
+        ports:
+          - name: nfs
+            containerPort: 2049
+          - name: mountd
+            containerPort: 20048
+          - name: rpcbind
+            containerPort: 111
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - mountPath: /exports
+            name: nfs-export-fast
+      volumes:
+        - name: nfs-export-fast
+          hostPath:
+            path: /data/nfs
+
+vagrant@master:~$ kubectl create -f nfs-server-rc.yaml
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME               READY     STATUS    RESTARTS   AGE       IP          NODE      NOMINATED NODE
+nfs-server-nqml2   1/1       Running   0          14m       10.32.0.4   node2     <none>
+
+- SSH into "node2", where our NFS server pod is running
+vagrant@master:~$ ssh node2
+vagrant@node2:~$ cat /data/nfs/index.html
+Hello from NFS!
+vagrant@node2:~$ exit
+logout
+Connection to node2 closed.
+
+
+
+
+---->Create Pod using our NFS server
+vagrant@master:~$ kubectl get service
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP                      5d
+nfs-server   ClusterIP   10.109.32.89   <none>        2049/TCP,20048/TCP,111/TCP   17m
+vagrant@master:~$ 
+Consuming the Mount by creating a pod
+
+vagrant@master:~$ cat nginx-nfs.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+spec:
+  containers:
+  - name: web
+    image: nginx
+    volumeMounts:
+      # name must match the volume name below
+    - name: nfs
+      mountPath: "/usr/share/nginx/html/"
+    ports:
+    - name: web
+      containerPort: 80
+      protocol: TCP
+  volumes:
+  - name: nfs
+    nfs:
+      # FIXME: use the right name
+      #server: nfs-server.default.kube.local
+      server: "10.109.32.89"
+      path: "/"
+      readOnly: false
+
+vagrant@master:~$ kubectl create -f nginx-nfs.yaml
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME               READY     STATUS    RESTARTS   AGE       IP          NODE      NOMINATED NODE
+nfs-server-nqml2   1/1       Running   0          22m       10.32.0.4   node2     <none>
+web                1/1       Running   0          21s       10.40.0.2   node1     <none>
+vagrant@master:~$
+
+Exec into the container to test writing to the NFS
+vagrant@master:~$ kubectl exec -it web -- bash
+root@web:/# cat /usr/share/nginx/html/index.html
+Hello from NFS!
+root@web:/# 
+root@web:/# echo "create new file" >> /usr/share/nginx/html/test.txt
+root@web:/# cat /usr/share/nginx/html/test.txt   
+create new file
+root@web:/# exit
+
+# SSH into "node2", where our NFS server pod is running
+
+vagrant@master:~$ ssh node2
+
+Verify that the file created inside of our web pod (running on "storage1") was persisted to the NFS directory on "storage0":
+
+vagrant@node2:~$ cat /data/nfs/
+index.html  test.txt    
+vagrant@node2:~$ cat /data/nfs/test.txt 
+create new file
+vagrant@node2:~$ 
+
+
+2-Dynamic Volumes using the NFS Provisioner
+
+
+###Stateful Applications: Deploying WordPress and MySQL with NFS Dynamic Volumes###
+
+-Create the NFS Server POD
+
+vagrant@master:~$ kubectl create -f nfs-server-rc.yaml
+
+-Create the default storage class (replace the server IP by the CLUSTER-IP of your nfs-server service , kubectl get service)
+
+vagrant@master:~$ cat nfs-storageclass.yaml 
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  namespace: default
+  name: default-storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    kubernetes.io/cluster-service: "true"
+provisioner: kubernetes.io/nfs
+parameters:
+  path: /
+  server: 10.111.26.188
+
+vagrant@master:~$ kubectl create -f nfs-storageclass.yaml 
+storageclass.storage.k8s.io/default-storage created
+vagrant@master:~$ kubectl get storageclass
+NAME                        PROVISIONER         AGE
+default-storage (default)   kubernetes.io/nfs   16s
+
+-Create persistent volumes (should be created by Admin cluster)
+
+vagrant@master:~$ cat nfs-persistent-volume.yaml 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv-1
+  labels:
+    type: local
+spec:
+  storageClassName: default-storage
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /data/nfs/pv-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv-2
+  labels:
+    type: local
+spec:
+  storageClassName: default-storage
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /data/nfs/pv-2
+vagrant@master:~$
+
+vagrant@master:~$ kubectl create -f nfs-persistent-volume.yaml 
+persistentvolume/local-pv-1 created
+persistentvolume/local-pv-2 created
+vagrant@master:~$ kubectl get persistentvolumes
+NAME         CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM     STORAGECLASS      REASON    AGE
+local-pv-1   500Mi      RWO            Retain           Available             default-storage             11s
+local-pv-2   500Mi      RWO            Retain           Available             default-storage             11s
+vagrant@master:~$
+
+
+-Create a Secret for MySQL Password
+vagrant@master:~$  kubectl create secret generic mysql-pass --from-literal=password=YOUR_PASSWORD
+
+default-token-6dtkp   kubernetes.io/service-account-token   3         15d
+mysql-pass            Opaque                                1         1d
+vagrant@master:~$ 
+
+-Create persistent volumes claim and Deploy application (Mysql and Wordpress)
+vagrant@master:~$ cat wordpress-deployment.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: wordpress
+    tier: mysql
+  clusterIP: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+  labels:
+    app: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 400Mi
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress
+spec:
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-pass
+              key: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: wordpress
+    tier: frontend
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wp-pv-claim
+  labels:
+    app: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 400Mi
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: frontend
+    spec:
+      containers:
+      - image: wordpress:4.8-apache
+        name: wordpress
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: wordpress-mysql
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-pass
+              key: password
+        ports:
+        - containerPort: 80
+          name: wordpress
+        volumeMounts:
+        - name: wordpress-persistent-storage
+          mountPath: /var/www/html
+      volumes:
+      - name: wordpress-persistent-storage
+        persistentVolumeClaim:
+          claimName: wp-pv-claim
+vagrant@master:~$ 
+
+vagrant@master:~$ kubectl create -f wordpress-deployment.yaml  
+service/wordpress-mysql created
+persistentvolumeclaim/mysql-pv-claim created
+deployment.apps/wordpress-mysql created
+service/wordpress created
+persistentvolumeclaim/wp-pv-claim created
+deployment.apps/wordpress created
+vagrant@master:~$ kubectl get pods -o wide
+NAME                              READY     STATUS        RESTARTS   AGE       IP          NODE      NOMINATED NODE
+nfs-server-kn8vn                  1/1       Running       0          2h        10.32.0.4   node2     <none>
+wordpress-5bc75fd7bd-pqcqf        1/1       Running       0          4s        10.32.0.5   node2     <none>
+wordpress-mysql-565494758-8vbd2   1/1       Running       0          5s        10.40.0.2   node1     <none>
+
+-Inspect deployment
+
+vagrant@master:~$ ssh node2
+vagrant@node2:~$ ls /data/nfs/
+pv-1  pv-2
+vagrant@node2:~$ ls /data/nfs/pv-1
+index.php    wp-activate.php     wp-comments-post.php  wp-content   wp-links-opml.php  wp-mail.php      wp-trackback.php
+license.txt  wp-admin            wp-config.php         wp-cron.php  wp-load.php        wp-settings.php  xmlrpc.php
+readme.html  wp-blog-header.php  wp-config-sample.php  wp-includes  wp-login.php       wp-signup.php
+vagrant@node2:~$ ls /data/nfs/pv-2
+auto.cnf  ibdata1  ib_logfile0  ib_logfile1  mysql  performance_schema  wordpress
+
+vagrant@master:~$ kubectl exec wordpress-mysql-565494758-8vbd2 -it -- bash
+root@wordpress-mysql-565494758-8vbd2:/# ls
+bin  boot  dev	docker-entrypoint-initdb.d  entrypoint.sh  etc	home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+
+root@wordpress-mysql-565494758-8vbd2:/# mysql -u root -p
+Enter password: 
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 5
+Server version: 5.6.41 MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| wordpress          |
++--------------------+
+4 rows in set (0.00 sec)
+
+-Test Wordpress
+vagrant@master:~$ kubectl get services
+NAME              TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+kubernetes        ClusterIP      10.96.0.1        <none>        443/TCP                      16d
+nfs-server        ClusterIP      10.107.221.244   <none>        2049/TCP,20048/TCP,111/TCP   12h
+wordpress         LoadBalancer   10.106.222.58    <pending>     80:31857/TCP                 10h
+wordpress-mysql   ClusterIP      None             <none>        3306/TCP                     10h
+vagrant@master:~$ 
+vagrant@master:~$ kubectl describe svc wordpress | grep NodePort 
+NodePort:                 <unset>  31857/TCP
+vagrant@master:~$ 
+
+Put the two together to get the URL for the WordPress service: http://10.106.222.58:31857
+
+-Scale Deployment
+vagrant@master:~$ kubectl scale --replicas=2 deployment/wordpress
+deployment.extensions/wordpress scaled
+vagrant@master:~$ kubectl get pods -o wide
+NAME                              READY     STATUS        RESTARTS   AGE       IP          NODE      NOMINATED NODE
+nfs-server-kn8vn                  1/1       Running       0          2h        10.32.0.4   node2     <none>
+web                               0/1       Terminating   0          9d        10.40.0.2   node1     <none>
+wordpress-5bc75fd7bd-pqcqf        1/1       Running       0          9m        10.32.0.5   node2     <none>
+wordpress-5bc75fd7bd-spclk        1/1       Running       0          4s        10.40.0.3   node1     <none>
+wordpress-mysql-565494758-8vbd2   1/1       Running       0          9m        10.40.0.2   node1     <none>
+
+
+-clean Deployment
+vagrant@master:~$ kubectl delete service -l app=wordpress
+vagrant@master:~$ kubectl delete deployment -l app=wordpress
+vagrant@master:~$ kubectl delete pvc -l app=wordpress
+
+vagrant@master:~$ kubectl delete secret mysql-pass
+
+
+
