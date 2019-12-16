@@ -1,3 +1,311 @@
+********************************************************************
+     Lab1 Introduction to Kubernetes
+********************************************************************
+
+1-Official Kubernetes Tutorials
+
+https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/
+
+2-Minikube Play Labs
+
+https://labs.play-with-k8s.com/
+
+
+********************************************************************
+		 Lab2 Set up Kubernetes cluster
+********************************************************************
+1-Install dependencies :
+
+-For ubuntu:
+sudo apt-get update
+wget https://releases.hashicorp.com/vagrant/2.1.4/vagrant_2.1.4_x86_64.deb
+dpkg -i vagrant_2.1.4_x86_64.deb
+apt-get install python2.7 python2.7-dev python-pip
+pip install ansible
+
+-For Centos :
+sudo yum -y install https://releases.hashicorp.com/vagrant/2.1.4/vagrant_2.1.4_x86_64.rpm (https://releases.hashicorp.com/vagrant/2.1.4/)
+sudo yum install git ansible
+
+2-Download Git Repository (Vagrant+Ansible)
+$git clone https://github.com/walidsaad/Mosaico3.git
+
+3-Prepare the Cluster with Vagrant
+
+$ cd Mosaico3/servers/vbox
+$ vagrant up
+Bringing machine 'kmaster' up with 'virtualbox' provider...
+Bringing machine 'knode1' up with 'virtualbox' provider...
+........................
+........................
+
+4-Add SSH Config
+walid@walidos:~/Mosaico3/servers/vbox$ vagrant ssh-config >>~/.ssh/config
+walid@walidos:~/Mosaico3/servers/vbox$ chmod 600 ~/.ssh/config
+
+5-Eidt the /etc/hosts file
+$ sudo vim /etc/hosts
+127.0.0.1 master node1 node2
+ 
+6-Install Kubernestes with Ansible
+
+$ cd ../../kubernetes
+$ cat inventory
+[masters]
+master
+[nodes]
+node1
+node2
+
+
+$ ansible-playbook site.yml
+.....................................
+
+PLAY [prepare all] *************************************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [node1]
+ok: [node2]
+ok: [master]
+
+TASK [prepare : include_tasks] *************************************************
+included: /home/grid02/kubernetes-lab/Mosaico3/kubernetes/roles/prepare/tasks/modules.yml for node1, node2, master
+
+TASK [prepare : command] *******************************************************
+changed: [node2] => (item=ip_vs)
+changed: [master] => (item=ip_vs)
+changed: [node1] => (item=ip_vs)
+changed: [node2] => (item=ip_vs_rr)
+changed: [master] => (item=ip_vs_rr)
+changed: [node1] => (item=ip_vs_rr)
+changed: [node2] => (item=ip_vs_wrr)
+changed: [master] => (item=ip_vs_wrr)
+changed: [node1] => (item=ip_vs_wrr)
+changed: [node2] => (item=ip_vs_sh)
+changed: [master] => (item=ip_vs_sh)
+changed: [node1] => (item=ip_vs_sh)
+changed: [node2] => (item=nf_conntrack_ipv4)
+changed: [master] => (item=nf_conntrack_ipv4)
+changed: [node1] => (item=nf_conntrack_ipv4)
+
+TASK [prepare : lineinfile] ****************************************************
+changed: [node1] => (item=ip_vs)
+changed: [node2] => (item=ip_vs)
+changed: [master] => (item=ip_vs)
+changed: [node1] => (item=ip_vs_rr)
+changed: [node2] => (item=ip_vs_rr)
+changed: [master] => (item=ip_vs_rr)
+changed: [node1] => (item=ip_vs_wrr)
+changed: [node2] => (item=ip_vs_wrr)
+changed: [master] => (item=ip_vs_wrr)
+changed: [node1] => (item=ip_vs_sh)
+changed: [node2] => (item=ip_vs_sh)
+changed: [master] => (item=ip_vs_sh)
+changed: [node1] => (item=nf_conntrack_ipv4)
+changed: [node2] => (item=nf_conntrack_ipv4)
+changed: [master] => (item=nf_conntrack_ipv4)
+
+TASK [prepare : include_tasks] *************************************************
+included: /home/grid02/kubernetes-lab/Mosaico3/kubernetes/roles/prepare/tasks/install.yml for node1, node2, master
+
+TASK [prepare : shell] *********************************************************
+ [WARNING]: Consider using the apt module rather than running apt-get.  If you
+need to use command because apt is insufficient you can add warn=False to this
+command task or set command_warnings=False in ansible.cfg to get rid of this
+message.
+
+changed: [node1]
+changed: [master]
+changed: [node2]
+
+TASK [prepare : apt_repository] ************************************************
+changed: [node2]
+changed: [node1]
+changed: [master]
+
+TASK [prepare : install docker and kubernetes] *********************************
+changed: [master] => (item=[u'docker.io', u'kubelet', u'kubeadm', u'kubectl', u'ntp'])
+changed: [node2] => (item=[u'docker.io', u'kubelet', u'kubeadm', u'kubectl', u'ntp'])
+changed: [node1] => (item=[u'docker.io', u'kubelet', u'kubeadm', u'kubectl', u'ntp'])
+
+TASK [prepare : include_tasks] *************************************************
+included: /home/grid02/kubernetes-lab/Mosaico3/kubernetes/roles/prepare/tasks/configure.yml for node1, node2, master
+
+TASK [prepare : sysctl] ********************************************************
+changed: [master]
+changed: [node1]
+changed: [node2]
+
+TASK [prepare : service] *******************************************************
+ok: [node1]
+ok: [node2]
+ok: [master]
+
+TASK [prepare : service] *******************************************************
+ok: [node1]
+ok: [node2]
+ok: [master]
+
+TASK [prepare : service] *******************************************************
+ok: [node1]
+ok: [node2]
+ok: [master]
+
+TASK [prepare : sysctl] ********************************************************
+changed: [node1]
+changed: [node2]
+changed: [master]
+
+TASK [prepare : sysctl] ********************************************************
+changed: [node1]
+changed: [node2]
+changed: [master]
+
+PLAY [init master] *************************************************************
+
+TASK [master : include_tasks] **************************************************
+included: /home/grid02/kubernetes-lab/Mosaico3/kubernetes/roles/master/tasks/init.yml for master
+
+TASK [master : lineinfile] *****************************************************
+changed: [master]
+
+TASK [master : lineinfile] *****************************************************
+changed: [master]
+
+PLAY RECAP *********************************************************************
+master                  : ok=18   changed=10   unreachable=0    failed=0
+node1                   : ok=15   changed=8    unreachable=0    failed=0
+node2                   : ok=15   changed=8    unreachable=0    failed=0
+
+.....................................
+$ cd ../../servers/vbox
+$ vagrant ssh master
+vagrant@master:~$ sudo kubeadm init --apiserver-advertise-address=10.0.0.10 --pod-network-cidr=10.244.0.0/16
+[init] using Kubernetes version: v1.11.3
+[preflight] running pre-flight checks
+I0911 00:12:09.309413   10001 kernel_validator.go:81] Validating kernel version
+I0911 00:12:09.309659   10001 kernel_validator.go:96] Validating kernel config
+[preflight/images] Pulling images required for setting up a Kubernetes cluster
+[preflight/images] This might take a minute or two, depending on the speed of your internet connection
+[preflight/images] You can also perform this action in beforehand using 'kubeadm config images pull'
+^[[A[kubelet] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[preflight] Activating the kubelet service
+[certificates] Generated ca certificate and key.
+[certificates] Generated apiserver certificate and key.
+[certificates] apiserver serving cert is signed for DNS names [master kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 10.0.0.10]
+[certificates] Generated apiserver-kubelet-client certificate and key.
+[certificates] Generated sa key and public key.
+[certificates] Generated front-proxy-ca certificate and key.
+[certificates] Generated front-proxy-client certificate and key.
+[certificates] Generated etcd/ca certificate and key.
+[certificates] Generated etcd/server certificate and key.
+[certificates] etcd/server serving cert is signed for DNS names [master localhost] and IPs [127.0.0.1 ::1]
+[certificates] Generated etcd/peer certificate and key.
+[certificates] etcd/peer serving cert is signed for DNS names [master localhost] and IPs [10.0.0.10 127.0.0.1 ::1]
+[certificates] Generated etcd/healthcheck-client certificate and key.
+[certificates] Generated apiserver-etcd-client certificate and key.
+[certificates] valid certificates and keys now exist in "/etc/kubernetes/pki"
+[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/admin.conf"
+[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/kubelet.conf"
+[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/controller-manager.conf"
+[kubeconfig] Wrote KubeConfig file to disk: "/etc/kubernetes/scheduler.conf"
+[controlplane] wrote Static Pod manifest for component kube-apiserver to "/etc/kubernetes/manifests/kube-apiserver.yaml"
+[controlplane] wrote Static Pod manifest for component kube-controller-manager to "/etc/kubernetes/manifests/kube-controller-manager.yaml"
+[controlplane] wrote Static Pod manifest for component kube-scheduler to "/etc/kubernetes/manifests/kube-scheduler.yaml"
+[etcd] Wrote Static Pod manifest for a local etcd instance to "/etc/kubernetes/manifests/etcd.yaml"
+[init] waiting for the kubelet to boot up the control plane as Static Pods from directory "/etc/kubernetes/manifests" 
+[init] this might take a minute or longer if the control plane images have to be pulled
+[apiclient] All control plane components are healthy after 47.004386 seconds
+[uploadconfig] storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config-1.11" in namespace kube-system with the configuration for the kubelets in the cluster
+[markmaster] Marking the node master as master by adding the label "node-role.kubernetes.io/master=''"
+[markmaster] Marking the node master as master by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+[patchnode] Uploading the CRI Socket information "/var/run/dockershim.sock" to the Node API object "master" as an annotation
+[bootstraptoken] using token: c5f5s8.k002ruynz8sqgzmi
+[bootstraptoken] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstraptoken] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstraptoken] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[bootstraptoken] creating the "cluster-info" ConfigMap in the "kube-public" namespace
+[addons] Applied essential addon: CoreDNS
+[addons] Applied essential addon: kube-proxy
+
+Your Kubernetes master has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of machines by running the following on each node
+as root:
+
+  kubeadm join 10.0.0.10:6443 --token c5f5s8.k002ruynz8sqgzmi --discovery-token-ca-cert-hash sha256:a6930447a15667ccd93c0a6ae3cd4a25637f6f1f5e6039e339abb83513a2924a
+
+7-Configure Master (Admin Conf and Network)
+vagrant@master:~$ mkdir -p $HOME/.kube && sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config && sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+https://www.weave.works/docs/net/latest/kubernetes/kube-addon/
+vagrant@master:~$ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+7-Join Nodes to Master
+
+vagrant@node1:~$ sudo kubeadm join 10.0.0.10:6443 --token c5f5s8.k002ruynz8sqgzmi --discovery-token-ca-cert-hash sha256:a6930447a15667ccd93c0a6ae3cd4a25637f6f1f5e6039e339abb83513a2924a
+[preflight] running pre-flight checks
+I0911 00:32:22.905741   10595 kernel_validator.go:81] Validating kernel version
+I0911 00:32:22.906179   10595 kernel_validator.go:96] Validating kernel config
+[discovery] Trying to connect to API Server "10.0.0.10:6443"
+[discovery] Created cluster-info discovery client, requesting info from "https://10.0.0.10:6443"
+[discovery] Requesting info from "https://10.0.0.10:6443" again to validate TLS against the pinned public key
+[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server "10.0.0.10:6443"
+[discovery] Successfully established connection with API Server "10.0.0.10:6443"
+[kubelet] Downloading configuration for the kubelet from the "kubelet-config-1.11" ConfigMap in the kube-system namespace
+[kubelet] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[preflight] Activating the kubelet service
+[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...
+[patchnode] Uploading the CRI Socket information "/var/run/dockershim.sock" to the Node API object "node1" as an annotation
+
+This node has joined the cluster:
+* Certificate signing request was sent to master and a response
+  was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the master to see this node join the cluster.
+vagrant@node1:~$ 
+vagrant@master:~$ kubectl get nodes
+NAME      STATUS    ROLES     AGE       VERSION
+master    Ready     master    2d        v1.11.2
+node1     Ready     <none>    2d        v1.11.2
+node2     Ready     <none>    2d        v1.11.2
+
+********************************************************************
+     Lab3 Kubectl Command
+********************************************************************
+$ kubectl -h
+$ kubectl cluster-info
+$ kubectl cluster-info dump
+$ kubectl config view
+$ kubectl get nodes -o wide
+$ kubectl describe node <nom-node>
+$ kubectl get pods --all-namespaces
+$ kubectl explain -h
+$ kubectl explain pod
+$ kubectl explain pod.spec
+$ kubectl explain pod.spec.containers
+$ kubectl explain deployments
+
+********************************************************************
+     Lab4 Manage Pods
+********************************************************************
+1-Create the first Pod
+
+vagrant@master:~$ vim pod.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -9,3 +317,163 @@ spec:
   - name: myapp-container
     image: busybox
     command: ['sh', '-c', 'echo Hello Kubernetes! && sleep 360']
+vagrant@master:~$ kubectl create -f pod.yaml 
+pod/myapp-pod created
+vagrant@master:~$ 
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME        READY     STATUS             RESTARTS   AGE       IP          NODE      NOMINATED NODE
+myapp-pod   0/1       ImagePullBackOff   0          9h        10.32.0.4   node2     <none>
+
+vagrant@master:~$ kubectl logs myapp-pod
+Hello Kubernetes!
+vagrant@master:~$ kubectl exec myapp-pod echo bonjour
+bonjour
+vagrant@master:~$ kubectl exec myapp-pod env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=myapp-pod
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+HOME=/root
+
+vagrant@master:~$ kubectl exec myapp-pod ping www.google.com
+PING www.google.com (172.217.23.68): 56 data bytes
+64 bytes from 172.217.23.68: seq=0 ttl=61 time=23.082 ms
+64 bytes from 172.217.23.68: seq=1 ttl=61 time=23.410 ms
+^C
+vagrant@master:~$
+
+vagrant@master:~$ kubectl get pods -o wide
+NAME        READY     STATUS    RESTARTS   AGE       IP          NODE      NOMINATED NODE
+myapp-pod   1/1       Running   44         15h       10.32.0.4   node2     <none>
+
+
+
+2-Create Pods with Deployment Object
+
+vagrant@master:~$ kubectl run kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1 --port=8080
+deployment.apps/kubernetes-bootcamp created
+vagrant@master:~$ kubectl get pods -o wide
+NAME                                  READY     STATUS              RESTARTS   AGE       IP          NODE      NOMINATED NODE
+kubernetes-bootcamp-69bf88c8c-5x9x9   0/1       ContainerCreating   0          4s        <none>      node1     <none>
+myapp-pod                             1/1       Running             44         15h       10.32.0.4   node2     <none>
+
+vagrant@master:~$ kubectl get deployments
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           2m
+
+
+********************************************************************
+     Lab5 Working with Namespaces and Labes
+********************************************************************
+
+-Using template
+$ cat dev-namespace.json
+{
+"kind": "Namespace",
+"apiVersion": "v1",
+"metadata": {
+"name": "dev"
+}
+}
+
+$ kubectl create -f dev-namespace.json
+namespace/dev created
+
+$ kubectl get namespaces --show-labels
+NAME              STATUS   AGE   LABELS
+default           Active   31m   <none>
+dev                Active   2m    <none>
+kube-node-lease   Active   31m   <none>
+kube-public       Active   31m   <none>
+kube-system       Active   31m   <none>
+
+-Add Label to Namespace dev
+
+$ kubectl label namespaces dev env=project1
+namespace/dev labeled
+
+$ kubectl get namespaces --show-labels
+NAME              STATUS   AGE    LABELS
+default           Active   33m    <none>
+dev                Active   4m5s   env=project1
+kube-node-lease   Active   33m    <none>
+kube-public       Active   33m    <none>
+kube-system       Active   33m    <none>
+
+
+-Create a second namespace using the namespace  command
+
+$ kubectl create namespace test
+namespace/test created
+--> Add these labels to test namespace
+"env": "project1",
+"app": "testserver"
+
+-->  Add this label to dev namespace
+"tier": "backendserver"
+
+$ kubectl get namespaces
+$ kubectl get namespaces --show-labels
+
+-Filter Namespace with Labes
+$ kubectl get namespaces --show-labels                       NAME              STATUS   AGE     LABELS
+default           Active   84m     <none>
+dev               Active   3m57s   env=project1,tier=backendserver
+kube-node-lease   Active   84m     <none>
+kube-public       Active   84m     <none>
+kube-system       Active   84m     <none>
+test              Active   9m39s   env=project1,tier=testserver
+
+$ kubectl get namespaces -l 'env in (project1), tier notin (testserver)'
+NAME   STATUS   AGE
+dev    Active   3m32s
+
+
+-Deploy Pods with Namespace
+
+$ vim nginx.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backendserver
+      env: project1
+  template:
+    metadata:
+      labels:
+        app: backendserver
+        env: project1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
+
+$ kubectl create -f nginx.yaml -n dev
+deployment.apps/nginx-deployment created
+
+$ kubectl get -n dev pod --show-labels
+NAME                               READY   STATUS              RESTARTS   AGE   LABELS
+nginx-deployment-b47dc74bd-m7gv4   0/1     ContainerCreating   0          27s   app=backendserver,env=project1,pod-template-hash=b47dc74bd
+nginx-deployment-b47dc74bd-wthnk   0/1     ContainerCreating   0          27s   app=backendserver,env=project1,pod-template-hash=b47dc74bd
+
+$ Kubectl delete -all pods
+
+
+********************************************************************
+     Lab5 Build Docker Image && Docker Hub
+********************************************************************
