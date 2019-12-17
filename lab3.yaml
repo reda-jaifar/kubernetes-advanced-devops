@@ -697,7 +697,7 @@ $ kubectl delete svc kubernetes-dashboard -n kube-system
 $ kubectl delete deployment kubernetes-dashboard -n kube-system
 3.2-Change the Dashboard service type (add type: LoadBalancer to the yaml file)
 
-$ wget https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+$ wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta8/aio/deploy/recommended.yaml
 $ cat kubernetes-dashboard.yaml
 # Copyright 2017 The Kubernetes Authors.
 #
