@@ -1,1 +1,17 @@
 
+nodes:
+  - address: 192.168.5.11
+    internal_address: 192.168.5.11
+    user: vagrant
+    ssh_key_path: /home/stagiaire/rancher-lab/vagrant-rancher/.vagrant/machines/master-1/virtualbox/private_key
+    role: [controlplane,worker,etcd]
+  - address: 192.168.5.21
+    internal_address: 192.168.5.21
+    user: vagrant
+    ssh_key_path: /home/stagiaire/rancher-lab/vagrant-rancher/.vagrant/machines/worker-1/virtualbox/private_key
+    role: [worker,etcd]
+  - address: 192.168.5.22
+    internal_address: 192.168.5.22
+    user: vagrant
+    ssh_key_path: /home/stagiaire/rancher-lab/vagrant-rancher/.vagrant/machines/master-1/virtualbox/private_key
+    role: [worker,etcd]
