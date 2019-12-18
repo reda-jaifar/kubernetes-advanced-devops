@@ -1,0 +1,28 @@
+pipeline {
+  /* Which container to bring up for the build. Pick one of the templates configured in Kubernetes plugin. */
+  agent {
+    label 'maven'
+  }
+  stages {
+    stage('Pull Source') {
+      steps {
+        git url: 'https://github.com/walidsaad/maven-example.git', branch: 'master'
+      }
+    }
+    stage('Build') {
+            steps {
+                sh 'mvn -B -DskipTests clean package'
+            }
+    }
+    stage('Unit Tests') {
+      steps {
+        sh 'mvn test'
+      }
+    }
+    stage('Deliver') {
+            steps {
+                sh 'java -jar target/training-app-1.1-SNAPSHOT.jar'
+            }
+        }
+}
+}
