@@ -1,0 +1,741 @@
+********************************************************************
+     Lab22 Rancher Manual Quick Start
+********************************************************************
+
+1. Provision a Linux Host
+Begin creation of a custom cluster by provisioning a Linux host. 
+Your host can be:
+
+A cloud-host virtual machine (VM)
+An on-premise VM
+A bare-metal server
+NOTE:
+When using a cloud-hosted virtual machine you need to allow 
+inbound TCP communication to ports 80 and 443. 
+Please see your cloud-host’s documentation for information 
+regarding port configuration.
+
+For a full list of port requirements, refer to Single Node Installation.
+
+Provision the host according to our Requirements.
+
+2. Install Rancher
+To install Rancher on your host, connect to it and then 
+use a shell to install.
+
+Log in to your Linux host using your preferred shell, 
+such as PuTTy or a remote Terminal connection.
+
+From your shell, enter the following command:
+
+$ sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher
+Result: Rancher is installed.
+
+3. Log In
+Log in to Rancher to begin using the application. After you log in, 
+you’ll make some one-time configurations.
+
+Open a web browser and enter the IP address of your host: https://<SERVER_IP>.
+
+Replace <SERVER_IP> with your host IP address.
+
+When prompted, create a password for the default admin account there cowpoke!
+
+Set the Rancher Server URL. The URL can either be an IP address or a host name. However, each node added to your cluster must be able to connect to this URL.
+
+If you use a hostname in the URL, this hostname must be 
+resolvable by DNS on the nodes you want to add to you cluster.
+
+
+
+4. Create the Cluster
+Welcome to Rancher! You are now able to create your first Kubernetes cluster.
+
+In this task, you can use the versatile Custom option. 
+This option lets you add any Linux host (cloud-hosted VM, on-premise VM, 
+or bare-metal) to be used in a cluster.
+
+From the Clusters page, click Add Cluster.
+
+Choose Custom.
+
+Enter a Cluster Name.
+
+Skip Member Roles and Cluster Options. We’ll tell you about them later.
+
+Click Next.
+
+From Node Role, select all the roles: etcd, Control, and Worker.
+
+Optional: Rancher auto-detects the IP addresses used for 
+Rancher communication and cluster communication. 
+You can override these using Public Address and Internal Address 
+in the Node Address section.
+
+Skip the Labels stuff. It’s not important for now.
+
+Copy the command displayed on screen to your clipboard.
+
+Log in to your Linux host using your preferred shell, such as 
+PuTTy or a remote Terminal connection. Run the command copied 
+to your clipboard.
+
+When you finish running the command on your Linux host, click Done.
+
+Result:
+
+Your cluster is created and assigned a state of Provisioning. 
+Rancher is standing up your cluster.
+You can access your cluster after its state is updated to Active.
+Active clusters are assigned two Projects, Default (containing 
+the namespace default) and System (containing the namespaces cattle-system,
+ingress-nginx,kube-public and kube-system, if present).
+
+********************************************************************
+     Lab23 Rancher Vagrant Quick Start
+********************************************************************
+-Prerequisites
+Vagrant: Vagrant is required as this is used to provision the
+ machine based on the Vagrantfile.
+ https://www.vagrantup.com/downloads.html
+Virtualbox: The virtual machines that Vagrant provisions need
+ to be provisioned to VirtualBox.
+At least 4GB of free RAM.
+
+1-Clone Rancher Quickstart to a folder using 
+git clone https://github.com/rancher/quickstart.
+
+2-Go into the folder containing the Vagrantfile by executing 
+cd quickstart/vagrant.
+
+3-Optional: Edit config.yaml to:
+
+-Change the number of nodes and the memory allocations, 
+if required. (node.count, node.cpus, node.memory)
+-Change the password of the admin user for logging into Rancher. (default_password)
+
+4-To initiate the creation of the environment run, vagrant up.
+
+5-Once provisioning finishes, go to https://172.22.101.101 in the browser. The default user/password is admin/admin.
+
+Result: Rancher Server and your Kubernetes cluster is installed on VirtualBox.
+
+
+********************************************************************
+     Lab24 Rancher HA On AWS
+********************************************************************
+
+1-Install Required CLI Tools (kubectl, rke, Helm)
+
+1.1-kubectl COmmand
+$ curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+$ chmod +x ./kubectl
+$ sudo mv ./kubectl /usr/local/bin/kubectl
+
+1.2-Helm
+$ wget https://get.helm.sh/helm-v2.14.3-windows-amd64.zip
+
+1.3-RKE command
+
+https://github.com/rancher/rke/releases/
+$ wget https://github.com/rancher/rke/releases/download/v1.0.0/rke_linux-amd64
+$ sudo mv rke_linux-amd64 /usr/local/bin/rke
+chmod +x /usr/local/bin/rke
+2-Create LoadBalancer (Option)
+
+3-Create 2 EC2 Instances Ubuntu 8G RAM 30GB
+
+4-Install Docker on each instances
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker ubuntu
+
+
+
+5-Create Cluster Configuration
+
+-AWS Config
+walid@walidos:~/rancher-lab$ cat cluster.yaml
+
+nodes:
+  - address: 192.168.5.11
+    internal_address: 192.168.5.11
+    user: ubuntu
+    ssh_key_path: rke-test.pem
+    role: [controlplane,worker,etcd]
+  - address: 192.168.5.21
+    internal_address: 192.168.5.21
+    user: ubuntu
+    ssh_key_path: rke-test.pem
+    role: [worker,etcd]
+
+-Vagrant Config
+-->Add SSH Config
+walid@walidos:~/rancher-lab$ vagrant ssh-config >>~/.ssh/config
+walid@walidos:~/rancher-lab$ chmod 600 ~/.ssh/config
+walid@walidos:~/rancher-lab$ cat cluster.yaml 
+nodes:
+
+  - address: 192.168.5.11
+
+    internal_address: 192.168.5.11
+    user: vagrant
+    ssh_key_path: /home/walid/kubernetes-the-hard-way/vagrant/.vagrant/machines/master-1/virtualbox/private_key
+    role: [controlplane,worker,etcd]
+  - address: 192.168.5.21
+    internal_address: 192.168.5.21
+    user: vagrant
+    ssh_key_path: /home/walid/kubernetes-the-hard-way/vagrant/.vagrant/machines/worker-1/virtualbox/private_key
+    role: [worker,etcd]
+
+
+6-Execute Rancher RKE
+
+walid@walidos:~/rancher-lab$ ./rke up --config ./cluster.yaml
+WARN[0000] This is not an officially supported version (v1.0.0-rc6) of RKE. Please download the latest official release at https://github.com/rancher/rke/releases/latest 
+INFO[0000] Running RKE version: v1.0.0-rc6              
+INFO[0000] Initiating Kubernetes cluster                
+INFO[0000] [dialer] Setup tunnel for host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0000] [dialer] Setup tunnel for host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0001] Checking if container [cluster-state-deployer] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0002] Checking if container [cluster-state-deployer] is running on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0002] [certificates] Generating CA kubernetes certificates 
+INFO[0002] [certificates] Generating Kubernetes API server aggregation layer requestheader client CA certificates 
+INFO[0003] [certificates] Generating Kubernetes API server certificates 
+INFO[0003] [certificates] Generating Service account token key 
+INFO[0003] [certificates] Generating Kube Controller certificates 
+INFO[0004] [certificates] Generating Kube Scheduler certificates 
+INFO[0004] [certificates] Generating Kube Proxy certificates 
+INFO[0005] [certificates] Generating Node certificate   
+INFO[0005] [certificates] Generating admin certificates and kubeconfig 
+INFO[0005] [certificates] Generating Kubernetes API server proxy client certificates 
+INFO[0006] [certificates] Generating kube-etcd-172-31-27-176 certificate and key 
+INFO[0006] [certificates] Generating kube-etcd-172-31-19-50 certificate and key 
+INFO[0007] Successfully Deployed state file at [./cluster.rkestate] 
+INFO[0007] Building Kubernetes cluster                  
+INFO[0007] [dialer] Setup tunnel for host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0007] [dialer] Setup tunnel for host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0009] [network] Deploying port listener containers 
+INFO[0009] [network] Starting stopped container [rke-etcd-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0009] Starting container [rke-etcd-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0009] [network] Starting stopped container [rke-etcd-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0009] Starting container [rke-etcd-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0010] [network] Successfully started [rke-etcd-port-listener] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0010] [network] Successfully started [rke-etcd-port-listener] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0010] [network] Starting stopped container [rke-cp-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0010] Starting container [rke-cp-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0011] [network] Successfully started [rke-cp-port-listener] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0011] [network] Starting stopped container [rke-worker-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0011] Starting container [rke-worker-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0012] [network] Successfully started [rke-worker-port-listener] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0012] [network] Port listener containers deployed successfully 
+INFO[0012] [network] Running etcd <-> etcd port checks  
+INFO[0012] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0012] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0012] Starting container [rke-port-checker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0012] Starting container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0013] [network] Successfully started [rke-port-checker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0013] [network] Successfully started [rke-port-checker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0013] Removing container [rke-port-checker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0013] Removing container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0013] [network] Running control plane -> etcd port checks 
+INFO[0013] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0013] Starting container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0014] [network] Successfully started [rke-port-checker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0014] Removing container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0014] [network] Running control plane -> worker port checks 
+INFO[0015] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0015] Starting container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0015] [network] Successfully started [rke-port-checker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0015] Removing container [rke-port-checker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0015] [network] Running workers -> control plane port checks 
+INFO[0016] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0016] Starting container [rke-port-checker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0016] [network] Successfully started [rke-port-checker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0017] Removing container [rke-port-checker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0017] [network] Checking KubeAPI port Control Plane hosts 
+INFO[0017] [network] Removing port listener containers  
+INFO[0017] Removing container [rke-etcd-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0017] Removing container [rke-etcd-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0017] [remove/rke-etcd-port-listener] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0017] [remove/rke-etcd-port-listener] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0018] Removing container [rke-cp-port-listener] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0018] [remove/rke-cp-port-listener] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0018] Removing container [rke-worker-port-listener] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0018] [remove/rke-worker-port-listener] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0018] [network] Port listener containers removed successfully 
+INFO[0018] [certificates] Deploying kubernetes certificates to Cluster nodes 
+INFO[0018] Checking if container [cert-deployer] is running on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0018] Checking if container [cert-deployer] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0019] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0019] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0019] Starting container [cert-deployer] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0019] Starting container [cert-deployer] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0019] Checking if container [cert-deployer] is running on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0020] Checking if container [cert-deployer] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0024] Checking if container [cert-deployer] is running on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0025] Removing container [cert-deployer] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0025] Checking if container [cert-deployer] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0025] Removing container [cert-deployer] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0025] [reconcile] Rebuilding and updating local kube config 
+INFO[0025] Successfully Deployed local admin kubeconfig at [./kube_config_cluster.yaml] 
+INFO[0025] [certificates] Successfully deployed kubernetes certificates to Cluster nodes 
+INFO[0025] [reconcile] Reconciling cluster state        
+INFO[0025] [reconcile] This is newly generated cluster  
+INFO[0025] Pre-pulling kubernetes images                
+INFO[0025] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0025] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0025] Kubernetes images pulled successfully        
+INFO[0025] [etcd] Building up etcd plane..              
+INFO[0026] Image [rancher/coreos-etcd:v3.3.15-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0026] Starting container [etcd] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0026] [etcd] Successfully started [etcd] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0026] [etcd] Running rolling snapshot container [etcd-snapshot-once] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0027] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0027] Starting container [etcd-rolling-snapshots] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0027] [etcd] Successfully started [etcd-rolling-snapshots] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0033] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0033] Starting container [rke-bundle-cert] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0033] [certificates] Successfully started [rke-bundle-cert] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0033] Waiting for [rke-bundle-cert] container to exit on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0034] [certificates] successfully saved certificate bundle [/opt/rke/etcd-snapshots//pki.bundle.tar.gz] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0034] Removing container [rke-bundle-cert] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0035] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0035] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0035] [etcd] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0036] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0036] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0036] Image [rancher/coreos-etcd:v3.3.15-rancher1] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0036] Starting container [etcd] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0037] [etcd] Successfully started [etcd] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0037] [etcd] Running rolling snapshot container [etcd-snapshot-once] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0037] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0037] Starting container [etcd-rolling-snapshots] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0038] [etcd] Successfully started [etcd-rolling-snapshots] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0043] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0043] Starting container [rke-bundle-cert] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0044] [certificates] Successfully started [rke-bundle-cert] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0044] Waiting for [rke-bundle-cert] container to exit on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0044] [certificates] successfully saved certificate bundle [/opt/rke/etcd-snapshots//pki.bundle.tar.gz] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0044] Removing container [rke-bundle-cert] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0045] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0045] Starting container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0045] [etcd] Successfully started [rke-log-linker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0046] Removing container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0046] [remove/rke-log-linker] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0046] [etcd] Successfully started etcd plane.. Checking etcd cluster health 
+INFO[0047] [controlplane] Building up Controller Plane.. 
+INFO[0047] Checking if container [service-sidekick] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0048] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0048] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0049] Starting container [kube-apiserver] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0049] [controlplane] Successfully started [kube-apiserver] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0049] [healthcheck] Start Healthcheck on service [kube-apiserver] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0061] [healthcheck] service [kube-apiserver] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0061] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0062] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0062] [controlplane] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0063] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0063] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0063] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0063] Starting container [kube-controller-manager] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0064] [controlplane] Successfully started [kube-controller-manager] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0064] [healthcheck] Start Healthcheck on service [kube-controller-manager] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0065] [healthcheck] service [kube-controller-manager] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0066] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0066] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0067] [controlplane] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0067] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0067] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0067] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0067] Starting container [kube-scheduler] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0068] [controlplane] Successfully started [kube-scheduler] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0068] [healthcheck] Start Healthcheck on service [kube-scheduler] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0070] [healthcheck] service [kube-scheduler] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0071] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0071] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0071] [controlplane] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0072] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0072] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0072] [controlplane] Successfully started Controller Plane.. 
+INFO[0072] [authz] Creating rke-job-deployer ServiceAccount 
+INFO[0073] [authz] rke-job-deployer ServiceAccount created successfully 
+INFO[0073] [authz] Creating system:node ClusterRoleBinding 
+INFO[0073] [authz] system:node ClusterRoleBinding created successfully 
+INFO[0073] [authz] Creating kube-apiserver proxy ClusterRole and ClusterRoleBinding 
+INFO[0073] [authz] kube-apiserver proxy ClusterRole and ClusterRoleBinding created successfully 
+INFO[0073] Successfully Deployed state file at [./cluster.rkestate] 
+INFO[0073] [state] Saving full cluster state to Kubernetes 
+INFO[0074] [state] Successfully Saved full cluster state to Kubernetes ConfigMap: cluster-state 
+INFO[0074] [worker] Building up Worker Plane..          
+INFO[0074] Checking if container [service-sidekick] is running on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0074] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0075] Starting container [nginx-proxy] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0075] [sidekick] Sidekick container already created on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0075] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0075] [worker] Successfully started [nginx-proxy] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0075] Starting container [kubelet] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0075] [worker] Successfully started [kubelet] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0075] [healthcheck] Start Healthcheck on service [kubelet] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0075] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0076] Starting container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0076] [worker] Successfully started [rke-log-linker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0076] Removing container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0076] [remove/rke-log-linker] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0076] Checking if container [service-sidekick] is running on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0077] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0077] [healthcheck] service [kubelet] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0077] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0077] Starting container [kubelet] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0077] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0077] [worker] Successfully started [kubelet] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0077] [healthcheck] Start Healthcheck on service [kubelet] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0078] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0078] [worker] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0078] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0079] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0079] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0079] Starting container [kube-proxy] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0080] [worker] Successfully started [kube-proxy] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0080] [healthcheck] Start Healthcheck on service [kube-proxy] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0081] [healthcheck] service [kube-proxy] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0082] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0082] Starting container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0082] [worker] Successfully started [rke-log-linker] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0083] Removing container [rke-log-linker] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0083] [remove/rke-log-linker] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0085] [healthcheck] service [kubelet] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0086] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0086] Starting container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0086] [worker] Successfully started [rke-log-linker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0087] Removing container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0087] [remove/rke-log-linker] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0087] Image [rancher/hyperkube:v1.16.3-rancher1] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0087] Starting container [kube-proxy] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0087] [worker] Successfully started [kube-proxy] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0087] [healthcheck] Start Healthcheck on service [kube-proxy] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0089] [healthcheck] service [kube-proxy] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] is healthy 
+INFO[0089] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0089] Starting container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0090] [worker] Successfully started [rke-log-linker] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0090] Removing container [rke-log-linker] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0090] [remove/rke-log-linker] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0090] [worker] Successfully started Worker Plane.. 
+INFO[0090] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0090] Image [rancher/rke-tools:v0.1.51] exists on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0090] Starting container [rke-log-cleaner] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0091] Starting container [rke-log-cleaner] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0091] [cleanup] Successfully started [rke-log-cleaner] container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0091] Removing container [rke-log-cleaner] on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0091] [cleanup] Successfully started [rke-log-cleaner] container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0091] [remove/rke-log-cleaner] Successfully removed container on host [ec2-34-246-163-150.eu-west-1.compute.amazonaws.com] 
+INFO[0091] Removing container [rke-log-cleaner] on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com], try #1 
+INFO[0092] [remove/rke-log-cleaner] Successfully removed container on host [ec2-52-211-28-207.eu-west-1.compute.amazonaws.com] 
+INFO[0092] [sync] Syncing nodes Labels and Taints       
+INFO[0092] [sync] Successfully synced nodes Labels and Taints 
+INFO[0092] [network] Setting up network plugin: canal   
+INFO[0092] [addons] Saving ConfigMap for addon rke-network-plugin to Kubernetes 
+INFO[0092] [addons] Successfully saved ConfigMap for addon rke-network-plugin to Kubernetes 
+INFO[0092] [addons] Executing deploy job rke-network-plugin 
+INFO[0098] [addons] Setting up coredns                  
+INFO[0098] [addons] Saving ConfigMap for addon rke-coredns-addon to Kubernetes 
+INFO[0099] [addons] Successfully saved ConfigMap for addon rke-coredns-addon to Kubernetes 
+INFO[0099] [addons] Executing deploy job rke-coredns-addon 
+INFO[0110] [addons] CoreDNS deployed successfully..     
+INFO[0110] [dns] DNS provider coredns deployed successfully 
+INFO[0110] [addons] Setting up Metrics Server           
+INFO[0110] [addons] Saving ConfigMap for addon rke-metrics-addon to Kubernetes 
+INFO[0110] [addons] Successfully saved ConfigMap for addon rke-metrics-addon to Kubernetes 
+INFO[0110] [addons] Executing deploy job rke-metrics-addon 
+INFO[0116] [addons] Metrics Server deployed successfully 
+INFO[0116] [ingress] Setting up nginx ingress controller 
+INFO[0116] [addons] Saving ConfigMap for addon rke-ingress-controller to Kubernetes 
+INFO[0116] [addons] Successfully saved ConfigMap for addon rke-ingress-controller to Kubernetes 
+INFO[0116] [addons] Executing deploy job rke-ingress-controller 
+INFO[0122] [ingress] ingress controller nginx deployed successfully 
+INFO[0122] [addons] Setting up user addons              
+INFO[0122] [addons] no user addons defined              
+INFO[0122] Finished building Kubernetes cluster successfully
+
+7-Install and Configure Helm and Cert-manager
+
+$ cat helm-certmanager-cnfig.sh
+# Input ENV variables
+export KUBECONFIG=kube_config_cluster.yaml
+export RANCHER_HOSTNAME=ec2-52-214-11-47.eu-west-1.compute.amazonaws.com
+
+# Helm setup rbac
+kubectl --kubeconfig ${KUBECONFIG} -n kube-system create serviceaccount tiller
+kubectl --kubeconfig ${KUBECONFIG} create clusterrolebinding tiller \
+  --clusterrole=cluster-admin \
+  --serviceaccount=kube-system:tiller
+helm init --service-account tiller
+kubectl --kubeconfig ${KUBECONFIG} -n kube-system  rollout status deploy/tiller-deploy
+
+# Helm install cert-manager
+kubectl --kubeconfig ${KUBECONFIG} apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.9/deploy/manifests/00-crds.yaml
+kubectl --kubeconfig ${KUBECONFIG} create namespace cert-manager
+
+kubectl --kubeconfig ${KUBECONFIG} label namespace cert-manager certmanager.k8s.io/disable-validation=true
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install --name cert-manager --namespace cert-manager --version v0.9.1 jetstack/cert-manager
+kubectl --kubeconfig ${KUBECONFIG} get pods --namespace cert-manager
+
+
+walid@walidos:~/rancher-lab$ sh helm-certmanager-cnfig.sh 
+serviceaccount/tiller created
+clusterrolebinding.rbac.authorization.k8s.io/tiller created
+$HELM_HOME has been configured at /home/walid/.helm.
+
+Tiller (the Helm server-side component) has been installed into your Kubernetes Cluster.
+
+Please note: by default, Tiller is deployed with an insecure 'allow unauthenticated users' policy.
+To prevent this, run `helm init` with the --tiller-tls-verify flag.
+For more information on securing your installation see: https://docs.helm.sh/using_helm/#securing-your-helm-installation
+Waiting for deployment "tiller-deploy" rollout to finish: 0 of 1 updated replicas are available...
+deployment "tiller-deploy" successfully rolled out
+customresourcedefinition.apiextensions.k8s.io/certificates.certmanager.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/certificaterequests.certmanager.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/challenges.certmanager.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/clusterissuers.certmanager.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/issuers.certmanager.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/orders.certmanager.k8s.io created
+namespace/cert-manager created
+namespace/cert-manager labeled
+"jetstack" has been added to your repositories
+Hang tight while we grab the latest from your chart repositories...
+...Skip local chart repository
+...Successfully got an update from the "jetstack" chart repository
+...Successfully got an update from the "rancher-latest" chart repository
+...Successfully got an update from the "stable" chart repository
+Update Complete.
+NAME:   cert-manager
+LAST DEPLOYED: Wed Nov 20 10:52:43 2019
+NAMESPACE: cert-manager
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ClusterRole
+NAME                                    AGE
+cert-manager-edit                       7s
+cert-manager-view                       7s
+cert-manager-webhook:webhook-requester  7s
+
+==> v1/Deployment
+NAME                     READY  UP-TO-DATE  AVAILABLE  AGE
+cert-manager             1/1    1           1          7s
+cert-manager-cainjector  1/1    1           1          7s
+cert-manager-webhook     0/1    1           0          7s
+
+==> v1/Pod(related)
+NAME                                      READY  STATUS             RESTARTS  AGE
+cert-manager-575db69b66-wp6xb             1/1    Running            0         5s
+cert-manager-cainjector-6d86bc5b5c-scb5v  1/1    Running            0         5s
+cert-manager-webhook-f67cf55c6-st9vv      0/1    ContainerCreating  0         5s
+
+==> v1/Service
+NAME                  TYPE       CLUSTER-IP    EXTERNAL-IP  PORT(S)  AGE
+cert-manager-webhook  ClusterIP  10.43.179.28  <none>       443/TCP  7s
+
+==> v1/ServiceAccount
+NAME                     SECRETS  AGE
+cert-manager             1        7s
+cert-manager-cainjector  1        7s
+cert-manager-webhook     1        7s
+
+==> v1alpha1/Certificate
+NAME                              AGE
+cert-manager-webhook-ca           6s
+cert-manager-webhook-webhook-tls  6s
+
+==> v1alpha1/Issuer
+NAME                           AGE
+cert-manager-webhook-ca        3s
+cert-manager-webhook-selfsign  3s
+
+==> v1beta1/APIService
+NAME                                  AGE
+v1beta1.admission.certmanager.k8s.io  7s
+
+==> v1beta1/ClusterRole
+NAME                                    AGE
+cert-manager-cainjector                 7s
+cert-manager-controller-certificates    7s
+cert-manager-controller-challenges      7s
+cert-manager-controller-clusterissuers  7s
+cert-manager-controller-ingress-shim    7s
+cert-manager-controller-issuers         7s
+cert-manager-controller-orders          7s
+cert-manager-leaderelection             7s
+
+==> v1beta1/ClusterRoleBinding
+NAME                                    AGE
+cert-manager-cainjector                 7s
+cert-manager-controller-certificates    7s
+cert-manager-controller-challenges      7s
+cert-manager-controller-clusterissuers  7s
+cert-manager-controller-ingress-shim    7s
+cert-manager-controller-issuers         7s
+cert-manager-controller-orders          7s
+cert-manager-leaderelection             7s
+cert-manager-webhook:auth-delegator     7s
+
+==> v1beta1/RoleBinding
+NAME                                                AGE
+cert-manager-webhook:webhook-authentication-reader  7s
+
+==> v1beta1/ValidatingWebhookConfiguration
+NAME                  AGE
+cert-manager-webhook  3s
+
+
+NOTES:
+cert-manager has been deployed successfully!
+
+In order to begin issuing certificates, you will need to set up a ClusterIssuer
+or Issuer resource (for example, by creating a 'letsencrypt-staging' issuer).
+
+More information on the different types of issuers and how to configure them
+can be found in our documentation:
+
+https://docs.cert-manager.io/en/latest/reference/issuers.html
+
+For information on how to configure cert-manager to automatically provision
+Certificates for Ingress resources, take a look at the `ingress-shim`
+documentation:
+
+https://docs.cert-manager.io/en/latest/reference/ingress-shim.html
+
+NAME                                       READY   STATUS              RESTARTS   AGE
+cert-manager-575db69b66-wp6xb              1/1     Running             0          6s
+cert-manager-cainjector-6d86bc5b5c-scb5v   1/1     Running             0          6s
+cert-manager-webhook-f67cf55c6-st9vv       0/1     ContainerCreating   0          6s
+"rancher-latest" has been added to your repositories
+NAME:   rancher
+LAST DEPLOYED: Wed Nov 20 10:57:55 2019
+NAMESPACE: cattle-system
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ClusterRoleBinding
+NAME     AGE
+rancher  6s
+
+==> v1/Deployment
+NAME     READY  UP-TO-DATE  AVAILABLE  AGE
+rancher  0/3    3           0          6s
+
+==> v1/Pod(related)
+NAME                      READY  STATUS             RESTARTS  AGE
+rancher-7fd77c47d8-42qw2  0/1    ContainerCreating  0         6s
+rancher-7fd77c47d8-5fs6s  0/1    ContainerCreating  0         5s
+rancher-7fd77c47d8-86xwd  0/1    ContainerCreating  0         5s
+
+==> v1/Service
+NAME     TYPE       CLUSTER-IP     EXTERNAL-IP  PORT(S)  AGE
+rancher  ClusterIP  10.43.125.164  <none>       80/TCP   6s
+
+==> v1/ServiceAccount
+NAME     SECRETS  AGE
+rancher  1        6s
+
+==> v1alpha1/Issuer
+NAME     AGE
+rancher  6s
+
+==> v1beta1/Ingress
+NAME     HOSTS                                              ADDRESS  PORTS  AGE
+rancher  ec2-52-211-28-207.eu-west-1.compute.amazonaws.com  80, 443  6s
+
+
+NOTES:
+Rancher Server has been installed.
+
+NOTE: Rancher may take several minutes to fully initialize. Please standby while Certificates are being issued and Ingress comes up.
+
+Check out our docs at https://rancher.com/docs/rancher/v2.x/en/
+
+Browse to https://ec2-52-211-28-207.eu-west-1.compute.amazonaws.com
+
+Happy Containering!
+
+8-Install Rancher Server
+
+walid@walidos:~/rancher-lab$./helm install rancher-latest/rancher   --name rancher   --namespace cattle-system   --set hostname=ec2-34-245-54-140.eu-west-1.compute.amazonaws.com
+
+
+9-Install Jenkins Server
+
+walid@walidos:~/rancher-lab$ ./helm install --name my-jenkins-server --set persistence.existingClaim=jenkins-volume stable/jenkins
+NAME:   my-jenkins-server
+LAST DEPLOYED: Wed Nov 20 17:06:11 2019
+NAMESPACE: default
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ConfigMap
+NAME                     DATA  AGE
+my-jenkins-server        5     2s
+my-jenkins-server-tests  1     2s
+
+==> v1/Deployment
+NAME               READY  UP-TO-DATE  AVAILABLE  AGE
+my-jenkins-server  0/1    1           0          2s
+
+==> v1/Pod(related)
+NAME                               READY  STATUS    RESTARTS  AGE
+my-jenkins-server-94f5c6984-kd6w4  0/1    Init:0/1  0         2s
+
+==> v1/Role
+NAME                               AGE
+my-jenkins-server-schedule-agents  2s
+
+==> v1/RoleBinding
+NAME                               AGE
+my-jenkins-server-schedule-agents  2s
+
+==> v1/Secret
+NAME               TYPE    DATA  AGE
+my-jenkins-server  Opaque  2     2s
+
+==> v1/Service
+NAME                     TYPE       CLUSTER-IP    EXTERNAL-IP  PORT(S)    AGE
+my-jenkins-server        ClusterIP  10.43.233.75  <none>       8080/TCP   2s
+my-jenkins-server-agent  ClusterIP  10.43.158.59  <none>       50000/TCP  2s
+
+==> v1/ServiceAccount
+NAME               SECRETS  AGE
+my-jenkins-server  1        2s
+
+
+NOTES:
+1. Get your 'admin' user password by running:
+  printf $(kubectl get secret --namespace default my-jenkins-server -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode);echo
+2. Get the Jenkins URL to visit by running these commands in the same shell:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/component=jenkins-master" -l "app.kubernetes.io/instance=my-jenkins-server" -o jsonpath="{.items[0].metadata.name}")
+  echo http://127.0.0.1:8080
+  kubectl --namespace default port-forward $POD_NAME 8080:8080
+
+3. Login with the password from step 1 and the username: admin
+
+
+For more information on running Jenkins on Kubernetes, visit:
+https://cloud.google.com/solutions/jenkins-on-container-engine
+
+9-Add Monitoring Stack (Prometheus+Grafana)
+
+10-Delete Rancher Server
+
+walid@walidos:~/rancher-lab$./helm del --purge rancher
+
+
+10-Delete k8s CLuster
+
+walid@walidos:~/rancher-lab$./rke remove --config ./cluster.yaml
+
+
+Rancher RKE Terraform Amazon
+https://github.com/yamamoto-febc/terraform-provider-rke
+https://www.terraform.io/docs/providers/rancher2/r/cluster.html
+https://github.com/JasonvanBrackel/terraform-modules/tree/master/managed-linux-windows-hybrid-azure
